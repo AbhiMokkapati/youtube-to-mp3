@@ -116,6 +116,24 @@ def validate_quality(quality) -> str:
     return q
 
 
+def validate_range(start=None, end=None, limit=None):
+    """Playlist start/end/limit must each be None or a whole number >= 1."""
+    for label, val in (("start", start), ("end", end), ("limit", limit)):
+        if val is not None and (isinstance(val, bool) or not isinstance(val, int) or val < 1):
+            raise ValueError(f"{label} must be a whole number of 1 or more.")
+    if start is not None and end is not None and end < start:
+        raise ValueError("end must not be less than start.")
+
+
+def escape_template(text: str) -> str:
+    """Escape '%' so yt-dlp doesn't treat part of a path as an output template.
+
+    Folder names come from remote playlist titles (and the user's own paths),
+    so a literal '%(...)s' there must not be expanded.
+    """
+    return str(text).replace("%", "%%")
+
+
 class DownloadCancelled(Exception):
     pass
 
@@ -125,9 +143,9 @@ def build_opts(output_dir: Path, quality: str, archive_path: Path,
                 outtmpl: str = None):
     if outtmpl is None:
         if is_playlist:
-            outtmpl = str(output_dir / "%(playlist_index)02d - %(title)s.%(ext)s")
+            outtmpl = escape_template(output_dir) + "/%(playlist_index)02d - %(title)s.%(ext)s"
         else:
-            outtmpl = str(output_dir / "%(title)s.%(ext)s")
+            outtmpl = escape_template(output_dir) + "/%(title)s.%(ext)s"
 
     opts = {
         "format": "bestaudio/best",
@@ -195,6 +213,7 @@ def run_download(url: str, output_dir: Path, quality: str, start=None, end=None,
     """
     url = validate_url(url)
     quality = validate_quality(quality)
+    validate_range(start, end, limit)
     output_dir = Path(output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -270,7 +289,7 @@ def run_download(url: str, output_dir: Path, quality: str, start=None, end=None,
             video_url = entry.get("url") or entry.get("webpage_url") or entry.get("id")
             if entry.get("id") and not str(video_url).startswith("http"):
                 video_url = f"https://www.youtube.com/watch?v={entry['id']}"
-            outtmpl = str(output_dir / f"{index:02d} - %(title)s.%(ext)s")
+            outtmpl = escape_template(output_dir) + f"/{index:02d} - %(title)s.%(ext)s"
             opts = build_opts(output_dir, quality, archive_path, None, None, None,
                                hook, TrackingLogger(), is_playlist=False, outtmpl=outtmpl)
             try:
@@ -295,5 +314,10 @@ def run_download(url: str, output_dir: Path, quality: str, start=None, end=None,
                            hook, TrackingLogger(), is_playlist)
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
+
+    # With ignoreerrors on, yt-dlp can swallow the exception our progress hook
+    # raises to cancel, so honour the cancel request explicitly here.
+    if cancel_check and cancel_check():
+        raise DownloadCancelled()
 
     return output_dir, failures

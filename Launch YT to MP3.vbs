@@ -1,7 +1,7 @@
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-pythonExe = "C:\Python314\pythonw.exe"
+pythonExe = "pythonw"
 gui = """" & scriptDir & "\yt2mp3_gui.py" & """"
 logPath = scriptDir & "\launch_error.log"
 

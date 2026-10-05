@@ -19,8 +19,8 @@ Only download content you have the right to download.
 
 ## Run
 
-- GUI: `pythonw yt2mp3_gui.py` (or `Launch YT to MP3.vbs`, which assumes
-  `C:\Python314\pythonw.exe` - edit the path if yours differs).
+- GUI: `pythonw yt2mp3_gui.py` (or double-click `Launch YT to MP3.vbs`,
+  which runs `pythonw` from your `PATH`).
 - CLI: `python yt2mp3.py <url> [-o DIR] [-q 192] [--start N --end M --limit N --workers 1-3]`
 
 Tests: `python -m unittest discover tests`
