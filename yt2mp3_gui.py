@@ -16,7 +16,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 try:
-    from yt2mp3_core import DownloadCancelled, run_download
+    from yt2mp3_core import DownloadCancelled, run_download, validate_url
 except ImportError as e:
     diag_path = Path(__file__).with_name("launch_diagnostics.log")
     vendor_dir = Path(__file__).with_name("vendor")
@@ -133,7 +133,7 @@ class YT2MP3App(tk.Tk):
         frm_log = ttk.Frame(self)
         frm_log.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.log_box = tk.Text(frm_log, height=12, wrap="word", state="disabled",
-                                font=("Consolas", 9), bg="#111", fg="#ddd")
+                                font=("Consolas", 10), bg="#111", fg="#ddd")
         scroll = ttk.Scrollbar(frm_log, command=self.log_box.yview)
         self.log_box.configure(yscrollcommand=scroll.set)
         self.log_box.pack(side="left", fill="both", expand=True)
@@ -147,7 +147,6 @@ class YT2MP3App(tk.Tk):
     def _open_output_folder(self):
         path = Path(self.output_dir.get()).expanduser()
         path.mkdir(parents=True, exist_ok=True)
-        import os
         os.startfile(path)
 
     def _log(self, msg: str):
@@ -183,6 +182,17 @@ class YT2MP3App(tk.Tk):
         start = self._parse_int(self.start_entry)
         end = self._parse_int(self.end_entry)
         limit = self._parse_int(self.limit_entry)
+        for label, entry, val in (("Start", self.start_entry, start),
+                                  ("End", self.end_entry, end),
+                                  ("Limit", self.limit_entry, limit)):
+            if entry.get().strip() and (val is None or val < 1):
+                messagebox.showwarning("Invalid range", f"{label} must be a whole number of 1 or more.")
+                return
+        try:
+            validate_url(url)
+        except ValueError as e:
+            messagebox.showwarning("Invalid URL", str(e))
+            return
 
         self.cancel_flag.clear()
         self.log_box.configure(state="normal")
@@ -220,10 +230,10 @@ class YT2MP3App(tk.Tk):
             elif d["status"] == "finished":
                 self.msg_queue.put(("progress", 100, "Converting to MP3..."))
             elif d["status"] == "error":
-                self.msg_queue.put(("log", "Error downloading this item."))
+                self.msg_queue.put(("log", "Error downloading this item.", None))
 
         def log_callback(msg):
-            self.msg_queue.put(("log", msg))
+            self.msg_queue.put(("log", msg, None))
 
         def cancel_check():
             return self.cancel_flag.is_set()
