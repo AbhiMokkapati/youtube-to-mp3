@@ -25,4 +25,4 @@ Only download content you have the right to download.
 
 Tests: `python -m unittest discover tests`
 
-No license has been chosen; all rights reserved by default.
+Released under the [MIT License](LICENSE).
