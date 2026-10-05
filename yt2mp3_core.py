@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -77,10 +78,42 @@ def ensure_pot_server(log_callback=None):
     log("Warning: PO-token server did not come up in time.")
 
 
+_RESERVED_NAMES = {"CON", "PRN", "AUX", "NUL",
+                   *(f"COM{i}" for i in range(1, 10)),
+                   *(f"LPT{i}" for i in range(1, 10))}
+
+
 def sanitize_filename(name: str) -> str:
-    """Make a string safe to use as a folder name."""
-    name = re.sub(r'[\\/*?:"<>|]', "_", name).strip()
-    return name or "downloads"
+    """Make a string safe to use as a single folder name.
+
+    Strips path separators, control characters, Windows-illegal characters,
+    leading/trailing dots and spaces (so ".." can never traverse out of the
+    output directory), reserved device names, and caps the length.
+    """
+    name = re.sub(r'[\\/*?:"<>|\x00-\x1f]', "_", name or "")
+    name = name.strip(" .")[:120].rstrip(" .")
+    if not name:
+        return "downloads"
+    if name.split(".")[0].upper() in _RESERVED_NAMES:
+        return f"_{name}"
+    return name
+
+
+def validate_url(url: str) -> str:
+    """Accept only http(s) URLs (blocks file:// and other local schemes)."""
+    url = (url or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Please enter a full http(s) URL.")
+    return url
+
+
+def validate_quality(quality) -> str:
+    """MP3 bitrate must be a plain number of kbps (passed through to ffmpeg)."""
+    q = str(quality).strip()
+    if not (q.isdigit() and 32 <= int(q) <= 320):
+        raise ValueError("Quality must be a bitrate between 32 and 320 kbps.")
+    return q
 
 
 class DownloadCancelled(Exception):
@@ -160,6 +193,8 @@ def run_download(url: str, output_dir: Path, quality: str, start=None, end=None,
 
     Returns (final_output_dir, failures: list[str]).
     """
+    url = validate_url(url)
+    quality = validate_quality(quality)
     output_dir = Path(output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -211,7 +246,7 @@ def run_download(url: str, output_dir: Path, quality: str, start=None, end=None,
         if progress_hook:
             progress_hook(d)
 
-    workers = max(1, int(workers or 1))
+    workers = min(max(1, int(workers or 1)), 3)
 
     if is_playlist and workers > 1:
         entries = list(info.get("entries") or [])

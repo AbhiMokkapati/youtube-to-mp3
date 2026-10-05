@@ -75,7 +75,7 @@ def main():
             start=args.start, end=args.end, limit=args.limit, workers=args.workers,
             progress_hook=progress.hook, log_callback=print,
         )
-    except RuntimeError as e:
+    except (RuntimeError, ValueError) as e:
         sys.exit(str(e))
 
     print("\n\nDone.")
