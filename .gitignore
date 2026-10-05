@@ -2,3 +2,6 @@ vendor/
 __pycache__/
 *.log
 .claude/
+downloads/
+*.mp3
+launch_diagnostics.log

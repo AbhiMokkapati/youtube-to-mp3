@@ -1,0 +1,2 @@
+# Only needed to regenerate icon.ico (make_icon.py)
+Pillow
